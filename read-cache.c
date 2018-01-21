@@ -461,16 +461,30 @@ int df_name_compare(const char *name1, int len1, int mode1,
 	return c1 - c2;
 }
 
-int lcp_name_compare(const char *name1, size_t len1, const char *name2, size_t len2, size_t *lcp)
+int old_name_compare(const char *name1, size_t len1, const char *name2, size_t len2)
 {
 	size_t min_len = (len1 < len2) ? len1 : len2;
-	size_t i = *lcp;
-	//	int cmp = memcmp(name1, name2, min_len);
-	for(; i < min_len && name1[i] == name2[i]; i++ )
-	  ;
+	int cmp = memcmp(name1, name2, min_len);
+	if (cmp)
+		return cmp;
+	if (len1 < len2)
+		return -1;
+	if (len1 > len2)
+		return 1;
+	return 0;
+}
 
-	int cmp = name1[i] - name2[i];
-	*lcp = i;
+int lcp_name_compare(const char *name1, size_t len1, const char *name2, size_t len2, size_t *lcp)
+{
+	int cmp = 0;
+	size_t min_len = (len1 < len2) ? len1 : len2;
+	size_t i = *lcp;
+
+	while(i < min_len && name1[i] == name2[i])
+	  i++;
+
+	if (i < min_len)
+		cmp = ((unsigned char)name1[i] - (unsigned char)name2[i]);
 
 	if (cmp)
 		return cmp;
@@ -483,15 +497,14 @@ int lcp_name_compare(const char *name1, size_t len1, const char *name2, size_t l
 
 int name_compare(const char *name1, size_t len1, const char *name2, size_t len2)
 {
-  size_t zero = 0;
-  return lcp_name_compare(name1, len1, name2, len2, &zero);
+	size_t zero = 0;
+	return lcp_name_compare(name1, len1, name2, len2, &zero);
 }
 
 int cache_name_stage_lcp_compare(const char *name1, int len1, int stage1, const char *name2, int len2, int stage2, size_t *lcp)
 {
-	int cmp;
+	int cmp = lcp_name_compare(name1, len1, name2, len2, lcp);
 
-	cmp = lcp_name_compare(name1, len1, name2, len2, lcp);
 	if (cmp)
 		return cmp;
 
@@ -517,19 +530,19 @@ static int index_name_stage_pos(const struct index_state *istate, const char *na
 	last = istate->cache_nr;
 	last_lcp = 0;
 	while (last > first) {
-		int next = (last + first) >> 1;
-		size_t next_lcp = (first_lcp > last_lcp) ? last_lcp : first_lcp; // min
+		int next = first + (last - first) / 2;
+		size_t next_lcp = first_lcp < last_lcp ? first_lcp : last_lcp;
 		struct cache_entry *ce = istate->cache[next];
 		int cmp = cache_name_stage_lcp_compare(name, namelen, stage, ce->name, ce_namelen(ce), ce_stage(ce), &next_lcp);
-		if (!cmp)
+		if (cmp == 0)
 			return next;
 		if (cmp < 0) {
 			last = next;
 			last_lcp = next_lcp;
-			continue;
+		} else {
+                        first = next+1;
+                        first_lcp = next_lcp;
 		}
-		first = next+1;
-		first_lcp = next_lcp;
 	}
 	return -first-1;
 }
