@@ -534,15 +534,14 @@ static int index_name_stage_pos(const struct index_state *istate, const char *na
 		size_t next_lcp = first_lcp < last_lcp ? first_lcp : last_lcp;
 		struct cache_entry *ce = istate->cache[next];
 		int cmp = cache_name_stage_lcp_compare(name, namelen, stage, ce->name, ce_namelen(ce), ce_stage(ce), &next_lcp);
-		if (cmp == 0)
-			return next;
 		if (cmp < 0) {
 			last = next;
 			last_lcp = next_lcp;
-		} else {
+		} else if (cmp > 0) {
                         first = next+1;
                         first_lcp = next_lcp;
-		}
+		} else
+			return next;
 	}
 	return -first-1;
 }
